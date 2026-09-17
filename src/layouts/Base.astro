@@ -1,0 +1,31 @@
+---
+import { title as comicTitle } from '../lib/comic';
+interface Props { title?: string; preload?: { srcset: string; sizes: string } }
+const { title = comicTitle, preload } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {preload && (
+      <link rel="preload" as="image" imagesrcset={preload.srcset} imagesizes={preload.sizes} />
+    )}
+    <style is:global>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; margin: 0; }
+      html, body { height: 100%; }
+      body {
+        background: #111;
+        color: #bbb;
+        font: 15px/1.5 system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
