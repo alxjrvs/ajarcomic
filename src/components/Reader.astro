@@ -3,7 +3,7 @@ import { getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import Base from '../layouts/Base.astro';
 import { pages, pageCount, title, pageHref, endHref } from '../lib/comic';
-import { edgeBands, lightness } from '../lib/edges';
+import { pageEdge, lightness } from '../lib/edges';
 
 interface Props { n: number }
 const { n } = Astro.props;
@@ -30,14 +30,14 @@ const preload = nextSource
 
 // Background: extend the page's own edge color(s) beyond its borders when the
 // edges are clean enough to read; otherwise a neutral dark.
-const bands = await edgeBands((source as { fsPath?: string }).fsPath ?? new URL(`../../comic/${source.src.split('/').pop()}`, import.meta.url).pathname);
-const top = bands?.[0]?.color ?? '#111111';
-const bottom = bands?.[bands.length - 1]?.color ?? top;
+const edge = await pageEdge((source as { fsPath?: string }).fsPath ?? new URL(`../../comic/${source.src.split('/').pop()}`, import.meta.url).pathname);
+const top = edge?.top ?? '#111111';
+const bottom = edge?.bottom ?? top;
 // Rendered page height: the page area, or narrower viewports' width-bound height.
 const pageH = `min(100dvh - 40px, 100vw * ${(source.height / source.width).toFixed(4)})`;
-const split = bands && bands.length > 1 ? `calc(${bands[0]!.to.toFixed(3)} * ${pageH})` : null;
-const backdrop = split
-  ? `linear-gradient(to bottom, ${top} 0 ${split}, ${bottom} ${split} 100%)`
+const at = (f: number) => `calc(${f.toFixed(3)} * ${pageH})`;
+const backdrop = edge && edge.stops.length
+  ? `linear-gradient(to bottom, ${top} 0 ${at(edge.fadeFrom)}, ${edge.stops.map((s) => `${s.color} ${at(s.at)}`).join(', ')}, ${bottom} ${at(edge.fadeTo)} 100%)`
   : `linear-gradient(${top}, ${top})`;
 const light = lightness(bottom) > 0.5;
 ---

@@ -8,7 +8,15 @@ import sharp from 'sharp';
  */
 
 type RGB = [number, number, number];
-export interface Band { color: string; from: number; to: number } // fractions of page height
+/** Fractions are of page height. `stops` trace the page's own fade between the two colors. */
+export interface Edge {
+  top: string;
+  bottom: string;
+  fadeFrom: number;
+  fadeTo: number;
+  stops: { at: number; color: string }[];
+}
+type Read = { kind: 'solid'; color: RGB } | { kind: 'split'; top: RGB; bottom: RGB; lo: number; hi: number };
 
 const BUCKETS = 120;        // vertical resolution of the profile
 const TOL = 40;             // RGB distance treated as "same color"
@@ -49,13 +57,13 @@ const median = (colors: RGB[]): RGB => {
   return s[s.length >> 1]!;
 };
 
-function bands(p: RGB[]): Band[] | null {
+function read(p: RGB[]): Read | null {
   const n = p.length, anchor = Math.max(3, Math.round(n * 0.1));
   const A = median(p.slice(0, anchor)), B = median(p.slice(-anchor));
 
   if (dist(A, B) <= TOL) {
     const stray = p.filter((c) => dist(c, A) > TOL).length / n;
-    return stray <= STRAY_MAX ? [{ color: hex(median(p)), from: 0, to: 1 }] : null;
+    return stray <= STRAY_MAX ? { kind: 'solid', color: median(p) } : null;
   }
 
   // Two-tone: A on top, B below, with an optional fade between them.
@@ -70,43 +78,46 @@ function bands(p: RGB[]): Band[] | null {
   if (stray / n > STRAY_MAX) return null;
   if (top.includes('B') || bottom.includes('A')) return null;
 
-  const split = (lo + hi + 1) / 2 / n;
-  return [
-    { color: hex(median(p.slice(0, lo + 1))), from: 0, to: split },
-    { color: hex(median(p.slice(hi))), from: split, to: 1 },
-  ];
+  return { kind: 'split', top: median(p.slice(0, lo + 1)), bottom: median(p.slice(hi)), lo: lo / n, hi: (hi + 1) / n };
 }
 
 /** Fraction of samples within tolerance of a color. */
 const share = (p: RGB[], c: RGB) => p.filter((x) => dist(x, c) <= TOL).length / p.length;
 
-function reconcile(l: RGB[], r: RGB[]): Band[] | null {
-  const lb = bands(l), rb = bands(r);
-  if (lb && rb && lb.length === rb.length) {
-    const agree = lb.every((b, i) =>
-      dist(rgb(b.color), rgb(rb[i]!.color)) <= TOL && Math.abs(b.to - rb[i]!.to) <= SIDES_AGREE);
-    if (agree) {
-      // Average the split position across the two sides.
-      return lb.map((b, i) => ({
-        color: b.color,
-        from: i === 0 ? 0 : (b.from + rb[i]!.from) / 2,
-        to: i === lb.length - 1 ? 1 : (b.to + rb[i]!.to) / 2,
-      }));
+const solid = (c: RGB): Edge => ({ top: hex(c), bottom: hex(c), fadeFrom: 1, fadeTo: 1, stops: [] });
+
+function reconcile(l: RGB[], r: RGB[]): Edge | null {
+  const lr = read(l), rr = read(r);
+  if (lr?.kind === 'solid' && rr?.kind === 'solid' && dist(lr.color, rr.color) <= TOL) {
+    return solid(median([...l, ...r]));
+  }
+  if (lr?.kind === 'split' && rr?.kind === 'split'
+    && dist(lr.top, rr.top) <= TOL && dist(lr.bottom, rr.bottom) <= TOL
+    && Math.abs(lr.lo - rr.lo) <= SIDES_AGREE && Math.abs(lr.hi - rr.hi) <= SIDES_AGREE) {
+    const lo = (lr.lo + rr.lo) / 2, hi = (lr.hi + rr.hi) / 2;
+    // Trace the fade with the average of both edges, one stop per few buckets.
+    const n = l.length, i0 = Math.floor(lo * n), i1 = Math.ceil(hi * n);
+    const step = Math.max(1, Math.round((i1 - i0) / 12));
+    const stops = [];
+    for (let i = i0 + step; i < i1; i += step) {
+      const c = l[i]!.map((v, k) => (v + r[i]![k]!) / 2) as RGB;
+      stops.push({ at: (i + 0.5) / n, color: hex(c) });
     }
+    return { top: hex(lr.top), bottom: hex(lr.bottom), fadeFrom: lo, fadeTo: hi, stops };
   }
   // One side is solid and the other is nearly that color: a small drawing touches the edge.
-  for (const [mine, other] of [[lb, r], [rb, l]] as const) {
-    if (mine?.length === 1 && share(other, rgb(mine[0]!.color)) >= 1 - STRAY_MAX) return mine;
+  for (const [mine, other] of [[lr, r], [rr, l]] as const) {
+    if (mine?.kind === 'solid' && share(other, mine.color) >= 1 - STRAY_MAX) return solid(mine.color);
   }
   // Both edges taken together are overwhelmingly one color.
   const all = [...l, ...r], m = median(all);
-  if (share(all, m) >= 0.8) return [{ color: hex(m), from: 0, to: 1 }];
+  if (share(all, m) >= 0.8) return solid(m);
   return null;
 }
 
-const cache = new Map<string, Promise<Band[] | null>>();
+const cache = new Map<string, Promise<Edge | null>>();
 
-export function edgeBands(path: string): Promise<Band[] | null> {
+export function pageEdge(path: string): Promise<Edge | null> {
   if (!cache.has(path)) {
     cache.set(path, Promise.all([profile(path, 'left'), profile(path, 'right')]).then(([l, r]) => reconcile(l, r)));
   }
