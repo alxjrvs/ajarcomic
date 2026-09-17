@@ -45,7 +45,6 @@ const light = lightness(bg) > 0.5;
         decoding="sync"
         fetchpriority="high"
       />
-      {prev && <a class="zone prev" href={prev} aria-label="Previous page"></a>}
       <a class="zone next" href={next} aria-label="Next page"></a>
     </figure>
     <nav>
@@ -81,14 +80,12 @@ const light = lightness(bg) > 0.5;
     width: auto;
     height: auto;
   }
+  /* The whole page is the "next" link. */
   .zone {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 50%;
+    inset: 0;
+    cursor: pointer;
   }
-  .prev { left: 0; cursor: w-resize; }
-  .next { right: 0; cursor: e-resize; }
   nav {
     display: flex;
     gap: 1.25rem;
@@ -110,7 +107,7 @@ const light = lightness(bg) > 0.5;
   };
   addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === 'ArrowLeft') go('.zone.prev');
+    if (e.key === 'ArrowLeft') go('nav a[aria-label="Previous page"]');
     if (e.key === 'ArrowRight' || e.key === ' ') go('.zone.next');
   });
   let x0 = 0, y0 = 0;
@@ -119,6 +116,6 @@ const light = lightness(bg) > 0.5;
     const dx = e.changedTouches[0]!.clientX - x0;
     const dy = e.changedTouches[0]!.clientY - y0;
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return;
-    go(dx < 0 ? '.zone.next' : '.zone.prev');
+    go(dx < 0 ? '.zone.next' : 'nav a[aria-label="Previous page"]');
   });
 </script>
