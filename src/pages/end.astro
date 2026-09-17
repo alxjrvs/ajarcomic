@@ -1,0 +1,42 @@
+---
+import Base from '../layouts/Base.astro';
+import { title, pageHref } from '../lib/comic';
+
+const coda = Object.values(
+  import.meta.glob<{ Content: any }>('/comic/coda.md', { eager: true }),
+)[0];
+---
+<Base title={`${title} — end`}>
+  <main>
+    <article>{coda ? <coda.Content /> : <p>— end —</p>}</article>
+    <a class="again" href={pageHref(1)}>Back to the beginning</a>
+  </main>
+</Base>
+
+<style>
+  main {
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 2.5rem;
+    padding: 2rem 1rem;
+  }
+  article {
+    max-width: 34rem;
+    color: #aaa;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  article :global(p + p) { margin-top: 1em; }
+  article :global(em) { color: #ccc; }
+  .again {
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: #777;
+    border-bottom: 1px solid #333;
+    padding-bottom: 2px;
+  }
+  .again:hover { color: #ddd; border-color: #777; }
+</style>

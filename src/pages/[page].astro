@@ -1,0 +1,10 @@
+---
+import Reader from '../components/Reader.astro';
+import { pages } from '../lib/comic';
+
+// Page 1 is the site root (index.astro); the rest live at /2, /3, ...
+export function getStaticPaths() {
+  return pages.slice(1).map((_, i) => ({ params: { page: String(i + 2) } }));
+}
+---
+<Reader n={Number(Astro.params.page)} />
