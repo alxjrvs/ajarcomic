@@ -3,7 +3,7 @@ import { getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import Base from '../layouts/Base.astro';
 import { pages, pageCount, title, pageHref, endHref } from '../lib/comic';
-import { pageEdge, lightness } from '../lib/edges';
+import { dominantColor, lightness } from '../lib/color';
 
 interface Props { n: number }
 const { n } = Astro.props;
@@ -28,21 +28,12 @@ const preload = nextSource
   ? { srcset: (await getImage({ src: nextSource, widths, format: 'webp' })).srcSet.attribute, sizes: sizes(nextSource) }
   : undefined;
 
-// Background: extend the page's own edge color(s) beyond its borders when the
-// edges are clean enough to read; otherwise a neutral dark.
-const edge = await pageEdge((source as { fsPath?: string }).fsPath ?? new URL(`../../comic/${source.src.split('/').pop()}`, import.meta.url).pathname);
-const top = edge?.top ?? '#111111';
-const bottom = edge?.bottom ?? top;
-// Rendered page height: the page area, or narrower viewports' width-bound height.
-const pageH = `min(100dvh - 40px, 100vw * ${(source.height / source.width).toFixed(4)})`;
-const at = (f: number) => `calc(${f.toFixed(3)} * ${pageH})`;
-const backdrop = edge && edge.stops.length
-  ? `linear-gradient(to bottom, ${top} 0 ${at(edge.fadeFrom)}, ${edge.stops.map((s) => `${s.color} ${at(s.at)}`).join(', ')}, ${bottom} ${at(edge.fadeTo)} 100%)`
-  : `linear-gradient(${top}, ${top})`;
-const light = lightness(bottom) > 0.5;
+// Background carries the page's dominant color beyond its borders.
+const bg = await dominantColor((source as { fsPath?: string }).fsPath ?? new URL(`../../comic/${source.src.split('/').pop()}`, import.meta.url).pathname);
+const light = lightness(bg) > 0.5;
 ---
 <Base title={n === 1 ? title : `${title} — ${n}`} preload={preload}>
-  <main class:list={{ light }} style={`--backdrop:${backdrop};--bottom:${bottom}`}>
+  <main class:list={{ light }} style={`--bg:${bg}`}>
     <figure>
       <img
         src={img.src}
@@ -66,15 +57,14 @@ const light = lightness(bottom) > 0.5;
 </Base>
 
 <style>
-  /* The page gets the viewport minus a fixed 40px strip for the nav. The
-     backdrop gradient is sized to the page so a split lands on its seam. */
+  /* The page gets the viewport minus a fixed 40px strip for the nav. */
   main {
     min-height: 100dvh;
     display: grid;
     grid-template-rows: calc(100dvh - 40px) 40px;
     justify-items: center;
     align-items: start;
-    background: var(--backdrop) top / 100% calc(100dvh - 40px) no-repeat, var(--bottom);
+    background: var(--bg);
     --fg: #777;
     --fg-hover: #eee;
   }
