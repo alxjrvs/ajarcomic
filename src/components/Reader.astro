@@ -32,7 +32,7 @@ const preload = nextSource
 const bg = await dominantColor((source as { fsPath?: string }).fsPath ?? new URL(`../../comic/${source.src.split('/').pop()}`, import.meta.url).pathname);
 const light = lightness(bg) > 0.5;
 ---
-<Base title={n === 1 ? title : `${title} — ${n}`} preload={preload}>
+<Base title={n === 1 ? title : `${title} — ${n}`} preload={preload} page={n}>
   <main class:list={{ light }} style={`--bg:${bg}`}>
     <figure>
       <img
