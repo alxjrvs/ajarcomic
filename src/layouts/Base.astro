@@ -1,7 +1,18 @@
 ---
 import { title as comicTitle } from '../lib/comic';
-interface Props { title?: string; preload?: { srcset: string; sizes: string } }
-const { title = comicTitle, preload } = Astro.props;
+interface Props {
+  title?: string;
+  preload?: { srcset: string; sizes: string };
+  /** which page this is (none for the coda), for the hand-off below */
+  page?: number;
+}
+const { title = comicTitle, preload, page } = Astro.props;
+
+// Ajar has one home now: the comic on alxjrvs.com. This reader stays up so
+// old links keep working, but search engines are told the real page is
+// there, and readers are sent on to the same page of it.
+const HOME = 'https://alxjrvs.com/writing/ajar/';
+const target = page && page > 1 ? `${HOME}#page-${page}` : HOME;
 ---
 <!doctype html>
 <html lang="en">
@@ -9,6 +20,10 @@ const { title = comicTitle, preload } = Astro.props;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
+    <link rel="canonical" href={HOME} />
+    <meta name="robots" content="noindex, follow" />
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <script is:inline define:vars={{ target }}>location.replace(target);</script>
     {preload && (
       <link rel="preload" as="image" imagesrcset={preload.srcset} imagesizes={preload.sizes} />
     )}
